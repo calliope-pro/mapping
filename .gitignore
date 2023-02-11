@@ -1,0 +1,13 @@
+# Custom
+*.tsv
+homework/test/*
+
+# Python
+__pycache__
+
+# Editor
+.vscode/*
+
+# Data
+SE11/*
+human_chr1/*
