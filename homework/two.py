@@ -40,7 +40,8 @@ class Minimap:
         self.ref_seq_file_path = ref_seq_file_path
         self.mapping_result_output_file_path = (
             CURRENT_FOLDER_DIR
-            / f'mapping_result_{datetime.now().isoformat(timespec="seconds")}.tsv'
+            # / f'mapping_result_{datetime.now().isoformat(timespec="seconds")}.tsv'
+            / f"mapping_result_{window_size}_{k_mer_size}.tsv"
             if mapping_result_output_file_path is None
             else mapping_result_output_file_path
         )
@@ -236,17 +237,18 @@ if __name__ == "__main__":
     IS_TEST = False
     if IS_TEST:
         minimap = Minimap(
-            CURRENT_FOLDER_DIR / "test" / "read.fastq",
+            CURRENT_FOLDER_DIR / "test" / "PacBio.fastq",
             CURRENT_FOLDER_DIR / "test" / "ref.fasta",
             window_size=10,
-            k_mer_size=40,
+            k_mer_size=20,
         )
         minimap.run()
+
     else:
         minimap = Minimap(
-            CURRENT_FOLDER_DIR.parent / "SE11" / "Illumina_SE11.fastq",
+            CURRENT_FOLDER_DIR.parent / "SE11" / "PacBio_SE11.fastq",
             CURRENT_FOLDER_DIR.parent / "SE11" / "ref_SE11.fasta",
             window_size=10,
-            k_mer_size=40,
+            k_mer_size=20,
         )
         minimap.run()
