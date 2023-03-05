@@ -3,6 +3,7 @@ from functools import cache
 from collections.abc import Iterator
 from datetime import datetime
 from multiprocessing import cpu_count, Pool
+from multiprocessing.pool import Pool as IPool
 from pathlib import Path
 from typing import Literal, TypeAlias
 
@@ -163,7 +164,14 @@ class Minimap:
                 minimizers_set.add((k_mer_hash_strand_1_index, 1))
                 yield k_mer_hash_strand_1_value, k_mer_hash_strand_1_index, 1
 
-    def generate_analyzed_read_seq_output(self, args) -> str:
+    def generate_analyzed_read_seq_output(
+        self,
+        args: tuple[
+            ReadId,
+            str,
+            collections.defaultdict[Minimizer, list[tuple[RefId, Index, Strand]]],
+        ],
+    ) -> str:
         read_id, read_seq, ref_minimizer_dict = args
         read_seq_length = len(read_seq)
         hits: collections.defaultdict[
@@ -202,9 +210,10 @@ class Minimap:
             for (minimizer, ref_pos, strand) in ref_minimizer_iterator:
                 ref_minimizer_dict[minimizer].append((ref_id, ref_pos, strand))
 
-        outputs = []
+        outputs: list[str] = []
         with Pool(processes=self.processes) as pool:
-            outputs = pool.map(
+            pool: IPool
+            outputs: list[str] = pool.map(
                 self.generate_analyzed_read_seq_output,
                 [
                     (read_id, read_seq, ref_minimizer_dict)
