@@ -2,7 +2,7 @@ from collections import deque
 from typing import cast, TypeAlias, TypeVar
 
 Index: TypeAlias = int
-Value = TypeVar('Value', int , str)
+Value = TypeVar("Value", int, str)
 
 
 class SlideMin:
