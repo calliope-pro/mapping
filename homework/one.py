@@ -4,7 +4,6 @@ from collections.abc import Iterator
 from datetime import datetime
 from pathlib import Path
 from typing import Literal, TypeAlias
-from time import perf_counter
 
 from libs.slide_min import Index, SlideMin, Value
 
@@ -12,6 +11,7 @@ Minimizer: TypeAlias = int
 RefId: TypeAlias = str
 ReadId: TypeAlias = str
 Strand = Literal[0, 1]
+Twist = Literal[0, 1]
 
 CURRENT_FOLDER_DIR = Path(__file__).resolve().parent
 
@@ -45,7 +45,9 @@ class Minimap:
             else mapping_result_output_file_path
         )
         self.k_mer_size = k_mer_size
-        self.k_mer_hash_mod = 1 << ((k_mer_size - 1) * 2)  # = 4 ** (k_mer_size - 1)
+        self.k_mer_hash_mod = (
+            1 << ((k_mer_size - 1) * 2)
+        ) - 1  # = 4 ** (k_mer_size - 1) - 1, 下位bit全て1
         self.window_size = window_size
 
     def parse_ref_seq_file(self) -> dict[RefId, str]:
@@ -113,13 +115,11 @@ class Minimap:
                 k_mer_hash_strand_1_index,
                 k_mer_hash_strand_1_value,
             ) = k_mer_hashes_strand_1.min
-            if k_mer_hash_strand_0_value <= k_mer_hash_strand_1_value:
+            if k_mer_hash_strand_0_value < k_mer_hash_strand_1_value:
                 minimizers_set.add((k_mer_hash_strand_0_index, 0))
-                # yield k_mer_hash_strand_0_value, 0, 0
                 yield k_mer_hash_strand_0_value, k_mer_hash_strand_0_index, 0
-            else:
+            if k_mer_hash_strand_0_value > k_mer_hash_strand_1_value:
                 minimizers_set.add((k_mer_hash_strand_1_index, 1))
-                # yield k_mer_hash_strand_1_value, 0, 1
                 yield k_mer_hash_strand_1_value, k_mer_hash_strand_1_index, 1
 
         for j in range(seq_length - k_mer_size - window_size + 1):
@@ -143,93 +143,66 @@ class Minimap:
                 k_mer_hash_strand_1_value,
             ) = k_mer_hashes_strand_1.add(new_k_mer_hash_strand_1_value)
             if (
-                k_mer_hash_strand_0_value <= k_mer_hash_strand_1_value
+                k_mer_hash_strand_0_value < k_mer_hash_strand_1_value
                 and (k_mer_hash_strand_0_index, 0) not in minimizers_set
             ):
                 minimizers_set.add((k_mer_hash_strand_0_index, 0))
-                # yield k_mer_hash_strand_0_value, j + 1, 0
                 yield k_mer_hash_strand_0_value, k_mer_hash_strand_0_index, 0
             if (
                 k_mer_hash_strand_0_value > k_mer_hash_strand_1_value
                 and (k_mer_hash_strand_1_index, 1) not in minimizers_set
             ):
                 minimizers_set.add((k_mer_hash_strand_1_index, 1))
-                # yield k_mer_hash_strand_1_value, j + 1, 1
-                yield k_mer_hash_strand_1_value, k_mer_hash_strand_0_index, 1
+                yield k_mer_hash_strand_1_value, k_mer_hash_strand_1_index, 1
 
     def run(self) -> None:
         ref_seq_dict: dict[RefId, str] = self.parse_ref_seq_file()
         read_seq_dict: dict[ReadId, str] = self.parse_read_seq_file()
 
         ref_minimizer_dict: collections.defaultdict[
-            Minimizer, set[tuple[RefId, Index, Strand]]
-        ] = collections.defaultdict(set)
+            Minimizer, list[tuple[RefId, Index, Strand]]
+        ] = collections.defaultdict(list)
         for ref_id, ref_seq in ref_seq_dict.items():
-            for (minimizer, ref_pos, strand) in self.sketch_minimizers(ref_seq):
-                ref_minimizer_dict[minimizer].add((ref_id, ref_pos, strand))
-        # print(ref_minimizer_dict)
+            ref_minimizer_iterator = self.sketch_minimizers(ref_seq)
+            for (minimizer, ref_pos, strand) in ref_minimizer_iterator:
+                ref_minimizer_dict[minimizer].append((ref_id, ref_pos, strand))
 
         outputs = []
         for read_id, read_seq in read_seq_dict.items():
-            # hits: dict[tuple[RefId, Strand], Index] = {}
-            # hits: collections.defaultdict[
-            #     tuple[RefId, Strand], list[tuple[Index, Index]]
-            # ] = collections.defaultdict(list)
             read_seq_length = len(read_seq)
-            overlap_index_difference = (
-                read_seq_length - self.window_size - self.k_mer_size + 1
-            )
             hits: collections.defaultdict[
-                RefId,
-                collections.Counter,
+                RefId, collections.Counter
             ] = collections.defaultdict(collections.Counter)
-            for (read_minimizer, read_pos, read_strand) in self.sketch_minimizers(read_seq):
+            read_minimizer_iterator = self.sketch_minimizers(read_seq)
+            for (read_minimizer, read_pos, read_strand) in read_minimizer_iterator:
                 for (ref_id, ref_pos, ref_strand) in ref_minimizer_dict[read_minimizer]:
-                    # print(read_minimizer, read_pos, read_strand, ref_id, ref_pos, ref_strand)
                     if read_strand == ref_strand:
-                        hits[ref_id][ref_pos - read_pos] += 1
-                        # hits[(ref_id, 0)] = min(ref_pos-read_pos, hits.get((ref_id, 0), ref_pos-read_pos))
-                        # hits[(ref_id, 0)].append((ref_pos, read_pos))
+                        hits[ref_id][ref_pos - read_pos + 1] += 1
                     else:
                         hits[ref_id][
-                            -(ref_pos + read_pos - overlap_index_difference)
+                            -(
+                                ref_pos
+                                - (read_seq_length - self.k_mer_size - read_pos)
+                                + 1
+                            )
                         ] += 1
-                        # hits[(ref_id, 1)] = min(ref_pos-read_pos, hits.get((ref_id, 1), ref_pos-read_pos))
-                        # hits[(ref_id, 1)].append((ref_pos, read_pos))
-            else:
-                score = 0
-                output = ""
-                for ref_id, counter in hits.items():
-                    most_common_hit = counter.most_common(1)[0]
-                    if most_common_hit[1] > score:
-                        score = most_common_hit[1]
-                        pos = (
-                            most_common_hit[0] + 1
-                            if most_common_hit[0] >= 0
-                            else -most_common_hit[0] + 1
-                        )
-                        output = self.format(
-                            read_id, ref_id, pos, int(most_common_hit[0] < 0)
-                        )
-                else:
-                    outputs.append(output)
-                # hits[(ref_id, 1)] = min(ref_pos*2-read_pos, hits.get((ref_id, 1), ref_pos-read_pos))
 
-            # print(read_id)
-            # print(hits)
-            # print()
-            # for (ref_id, strand_order), ref_pos in hits.items():
-            #     if strand_order == 0 and read_seq[0] == ref_seq_dict[ref_id][ref_pos]:
-            #         outputs.append(self.format(read_id, ref_id, ref_pos+1, 0))
-            #         break
-            #     if strand_order == 1 and self.seq2hash(read_seq[-1]) == self.seq2hash(ref_seq_dict[ref_id][ref_pos-1], strand=1):
-            #         outputs.append(self.format(read_id, ref_id, ref_pos, 1))
-            #         break
+            max_cnt = 0
+            output = ""
+            for ref_id, counter in hits.items():
+                most_common_pos, most_common_cnt = counter.most_common(1)[0]
+                if most_common_cnt > max_cnt:
+                    max_cnt = most_common_cnt
+                    output = self.format(
+                        read_id, ref_id, most_common_pos, int(most_common_pos < 0)
+                    )
+            outputs.append(output)
+
         with self.mapping_result_output_file_path.open("w") as f:
             f.writelines(outputs)
 
-    def format(self, read_id: ReadId, ref_id: RefId, pos: int, strand_order: Strand):
-        return f'{read_id}\t{ref_id}\t{pos}\t{"+-"[strand_order]}\n'
+    def format(self, read_id: ReadId, ref_id: RefId, pos: int, strand_order: Twist):
+        return f'{read_id}\t{ref_id}\t{abs(pos)}\t{"+-"[strand_order]}\n'
 
     @cache
     def calc_hash(
@@ -240,11 +213,11 @@ class Minimap:
     ) -> tuple[Minimizer, Minimizer]:
         k_mer_hash_mod = self.k_mer_hash_mod
         k_mer_hash_strand_0_value = (
-            last_k_mer_hash_strand_0_value % k_mer_hash_mod
-        ) * 4 + self.seq2hash(next_nucleotide)
-        k_mer_hash_strand_1_value = (
-            last_k_mer_hash_strand_1_value >> 2
-        ) + self.seq2hash(next_nucleotide, strand=1) * k_mer_hash_mod
+            (last_k_mer_hash_strand_0_value & k_mer_hash_mod) << 2
+        ) | self.seq2hash(next_nucleotide)
+        k_mer_hash_strand_1_value = (last_k_mer_hash_strand_1_value >> 2) | (
+            self.seq2hash(next_nucleotide, strand=1) << (2 * (self.k_mer_size - 1))
+        )
         return k_mer_hash_strand_0_value, k_mer_hash_strand_1_value
 
     @staticmethod
@@ -252,11 +225,11 @@ class Minimap:
     def seq2hash(seq: str, *, strand: Strand = 0) -> int:
         res: int = 0
         if strand == 0:
-            for i, v in enumerate(seq[::-1]):
-                res += NUCLEOTIDE_TO_INTEGER_MAPPING[v] * 4**i
+            for v in seq:
+                res = (res << 2) | NUCLEOTIDE_TO_INTEGER_MAPPING[v]
         else:
-            for i, v in enumerate(seq[::-1]):
-                res += (3 - NUCLEOTIDE_TO_INTEGER_MAPPING[v]) * 4**i
+            for v in seq[::-1]:
+                res = (res << 2) | (3 - NUCLEOTIDE_TO_INTEGER_MAPPING[v])
         return res
 
 
@@ -267,7 +240,7 @@ if __name__ == "__main__":
             CURRENT_FOLDER_DIR / "test" / "read.fastq",
             CURRENT_FOLDER_DIR / "test" / "ref.fasta",
             window_size=10,
-            k_mer_size=20,
+            k_mer_size=40,
         )
         minimap.run()
     else:
@@ -275,6 +248,6 @@ if __name__ == "__main__":
             CURRENT_FOLDER_DIR.parent / "SE11" / "Illumina_SE11.fastq",
             CURRENT_FOLDER_DIR.parent / "SE11" / "ref_SE11.fasta",
             window_size=10,
-            k_mer_size=20,
+            k_mer_size=40,
         )
         minimap.run()
