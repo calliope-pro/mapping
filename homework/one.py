@@ -2,6 +2,7 @@ import collections
 from functools import cache
 from collections.abc import Iterator
 from datetime import datetime
+from multiprocessing import cpu_count, Pool
 from pathlib import Path
 from typing import Literal, TypeAlias
 
@@ -27,6 +28,7 @@ class Minimap:
     window_size: int
     k_mer_size: int
     k_mer_hash_mod: int
+    processes: int
 
     def __init__(
         self,
@@ -35,6 +37,7 @@ class Minimap:
         window_size: int,
         k_mer_size: int,
         mapping_result_output_file_path: Path | None = None,
+        processes: int | None = None,
     ) -> None:
         self.read_seq_file_path = read_seq_file_path
         self.ref_seq_file_path = ref_seq_file_path
@@ -49,6 +52,10 @@ class Minimap:
             1 << ((k_mer_size - 1) * 2)
         ) - 1  # = 4 ** (k_mer_size - 1) - 1, 下位bit全て1
         self.window_size = window_size
+        self.processes = (
+            cpu_count() if processes is None else min(processes, cpu_count())
+        )
+        print(f"This program is runnig with {self.processes} processes.")
 
     def parse_ref_seq_file(self) -> dict[RefId, str]:
         ref_seq_dict: dict[RefId, str] = {}
@@ -155,6 +162,33 @@ class Minimap:
                 minimizers_set.add((k_mer_hash_strand_1_index, 1))
                 yield k_mer_hash_strand_1_value, k_mer_hash_strand_1_index, 1
 
+    def generate_analyzed_read_seq_output(self, args) -> str:
+        read_id, read_seq, ref_minimizer_dict = args
+        read_seq_length = len(read_seq)
+        hits: collections.defaultdict[
+            RefId, collections.Counter
+        ] = collections.defaultdict(collections.Counter)
+        read_minimizer_iterator = self.sketch_minimizers(read_seq)
+        for (read_minimizer, read_pos, read_strand) in read_minimizer_iterator:
+            for (ref_id, ref_pos, ref_strand) in ref_minimizer_dict[read_minimizer]:
+                if read_strand == ref_strand:
+                    hits[ref_id][ref_pos - read_pos + 1] += 1
+                else:
+                    hits[ref_id][
+                        -(ref_pos - (read_seq_length - self.k_mer_size - read_pos) + 1)
+                    ] += 1
+
+        max_cnt = 0
+        output = ""
+        for ref_id, counter in hits.items():
+            most_common_pos, most_common_cnt = counter.most_common(1)[0]
+            if most_common_cnt > max_cnt:
+                max_cnt = most_common_cnt
+                output = self.format(
+                    read_id, ref_id, most_common_pos, int(most_common_pos < 0)
+                )
+        return output
+
     def run(self) -> None:
         ref_seq_dict: dict[RefId, str] = self.parse_ref_seq_file()
         read_seq_dict: dict[ReadId, str] = self.parse_read_seq_file()
@@ -168,35 +202,14 @@ class Minimap:
                 ref_minimizer_dict[minimizer].append((ref_id, ref_pos, strand))
 
         outputs = []
-        for read_id, read_seq in read_seq_dict.items():
-            read_seq_length = len(read_seq)
-            hits: collections.defaultdict[
-                RefId, collections.Counter
-            ] = collections.defaultdict(collections.Counter)
-            read_minimizer_iterator = self.sketch_minimizers(read_seq)
-            for (read_minimizer, read_pos, read_strand) in read_minimizer_iterator:
-                for (ref_id, ref_pos, ref_strand) in ref_minimizer_dict[read_minimizer]:
-                    if read_strand == ref_strand:
-                        hits[ref_id][ref_pos - read_pos + 1] += 1
-                    else:
-                        hits[ref_id][
-                            -(
-                                ref_pos
-                                - (read_seq_length - self.k_mer_size - read_pos)
-                                + 1
-                            )
-                        ] += 1
-
-            max_cnt = 0
-            output = ""
-            for ref_id, counter in hits.items():
-                most_common_pos, most_common_cnt = counter.most_common(1)[0]
-                if most_common_cnt > max_cnt:
-                    max_cnt = most_common_cnt
-                    output = self.format(
-                        read_id, ref_id, most_common_pos, int(most_common_pos < 0)
-                    )
-            outputs.append(output)
+        with Pool(processes=self.processes) as pool:
+            outputs = pool.map(
+                self.generate_analyzed_read_seq_output,
+                [
+                    (read_id, read_seq, ref_minimizer_dict)
+                    for read_id, read_seq in read_seq_dict.items()
+                ],
+            )
 
         with self.mapping_result_output_file_path.open("w") as f:
             f.writelines(outputs)
