@@ -205,10 +205,10 @@ class Minimap:
         with Pool(processes=self.processes) as pool:
             outputs = pool.map(
                 self.generate_analyzed_read_seq_output,
-                [
+                (
                     (read_id, read_seq, ref_minimizer_dict)
                     for read_id, read_seq in read_seq_dict.items()
-                ],
+                ),
             )
 
         with self.mapping_result_output_file_path.open("w") as f:
