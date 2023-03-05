@@ -204,7 +204,6 @@ class Minimap:
     def format(self, read_id: ReadId, ref_id: RefId, pos: int, strand_order: Twist):
         return f'{read_id}\t{ref_id}\t{abs(pos)}\t{"+-"[strand_order]}\n'
 
-    @cache
     def calc_hash(
         self,
         last_k_mer_hash_strand_0_value: Minimizer,
