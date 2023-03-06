@@ -1,5 +1,5 @@
 from collections import deque
-from typing import cast, TypeAlias, TypeVar
+from typing import TypeAlias, TypeVar, cast
 
 Index: TypeAlias = int
 Value = TypeVar("Value", int, str)

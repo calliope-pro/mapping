@@ -1,8 +1,8 @@
 import collections
-from functools import cache
 from collections.abc import Iterator
 from datetime import datetime
-from multiprocessing import cpu_count, Pool
+from functools import cache
+from multiprocessing import Pool, cpu_count
 from multiprocessing.pool import Pool as IPool
 from pathlib import Path
 from typing import Literal, TypeAlias
@@ -44,8 +44,7 @@ class Minimap:
         self.ref_seq_file_path = ref_seq_file_path
         self.mapping_result_output_file_path = (
             CURRENT_FOLDER_DIR
-            # / f'mapping_result_{datetime.now().isoformat(timespec="seconds")}.tsv'
-            / f"mapping_result_{window_size}_{k_mer_size}.tsv"
+            / f'mapping_result_PacBio_{datetime.now().isoformat(timespec="seconds")}.tsv'
             if mapping_result_output_file_path is None
             else mapping_result_output_file_path
         )
