@@ -94,7 +94,7 @@ class Minimap:
     def sketch_minimizers(self, seq: str) -> Iterator[tuple[Value, Index, Strand]]:
         window_size = self.window_size
         k_mer_size = self.k_mer_size
-        minimizers_set: set[tuple[Index, Strand]] = set()
+        minimizers_set: set[Index] = set()
         seq_length = len(seq)
         k_mer_init = seq[:k_mer_size]
         k_mer_hashes_strand_0 = SlideMin(self.seq2hash(k_mer_init), window_size)
@@ -124,10 +124,10 @@ class Minimap:
                 k_mer_hash_strand_1_value,
             ) = k_mer_hashes_strand_1.min
             if k_mer_hash_strand_0_value < k_mer_hash_strand_1_value:
-                minimizers_set.add((k_mer_hash_strand_0_index, 0))
+                minimizers_set.add(k_mer_hash_strand_0_index)
                 yield k_mer_hash_strand_0_value, k_mer_hash_strand_0_index, 0
             if k_mer_hash_strand_0_value > k_mer_hash_strand_1_value:
-                minimizers_set.add((k_mer_hash_strand_1_index, 1))
+                minimizers_set.add(k_mer_hash_strand_1_index)
                 yield k_mer_hash_strand_1_value, k_mer_hash_strand_1_index, 1
 
         for j in range(seq_length - k_mer_size - window_size + 1):
@@ -152,15 +152,15 @@ class Minimap:
             ) = k_mer_hashes_strand_1.add(new_k_mer_hash_strand_1_value)
             if (
                 k_mer_hash_strand_0_value < k_mer_hash_strand_1_value
-                and (k_mer_hash_strand_0_index, 0) not in minimizers_set
+                and k_mer_hash_strand_0_index not in minimizers_set
             ):
-                minimizers_set.add((k_mer_hash_strand_0_index, 0))
+                minimizers_set.add(k_mer_hash_strand_0_index)
                 yield k_mer_hash_strand_0_value, k_mer_hash_strand_0_index, 0
             if (
                 k_mer_hash_strand_0_value > k_mer_hash_strand_1_value
-                and (k_mer_hash_strand_1_index, 1) not in minimizers_set
+                and k_mer_hash_strand_1_index not in minimizers_set
             ):
-                minimizers_set.add((k_mer_hash_strand_1_index, 1))
+                minimizers_set.add(k_mer_hash_strand_1_index)
                 yield k_mer_hash_strand_1_value, k_mer_hash_strand_1_index, 1
 
     def generate_analyzed_read_seq_output(
