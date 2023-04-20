@@ -6,16 +6,16 @@
 namespace libs
 {
   using Index = int;
-  using Value = int;
+  using Value = unsigned long long;
 
   class SlideMin
   {
   private:
     std::deque<std::pair<Index, Value>> deq_;
-    const int section_length_;
+    const unsigned short section_length_;
 
   public:
-    SlideMin(Value init_value, const int section_length)
+    SlideMin(Value init_value, const unsigned short section_length)
         : deq_(), section_length_(section_length)
     {
       deq_.emplace_back(std::pair<Index, Value>(0, init_value));
