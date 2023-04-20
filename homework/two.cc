@@ -68,8 +68,8 @@ public:
   {
     time_t now;
     time(&now);
-    char buf[sizeof "mapping_result_illumina_2011-10-08T07:07:09.tsv"];
-    strftime(buf, sizeof buf, "mapping_result_illumina_%FT%T.tsv", gmtime(&now));
+    char buf[sizeof "mapping_result_PacBio_2011-10-08T07:07:09.tsv"];
+    strftime(buf, sizeof buf, "mapping_result_PacBio_%FT%T.tsv", gmtime(&now));
     mapping_result_output_file_path_ = (mapping_result_output_file_path.has_value()) ? mapping_result_output_file_path.value() : buf;
   }
 
@@ -319,7 +319,7 @@ int main()
   else
   {
     Minimap minimap(
-        CURRENT_FOLDER_DIR / "SE11" / "Illumina_SE11.fastq",
+        CURRENT_FOLDER_DIR / "SE11" / "PacBio_SE11.fastq",
         CURRENT_FOLDER_DIR / "SE11" / "ref_SE11.fasta",
         10,
         15);
