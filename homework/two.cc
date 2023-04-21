@@ -137,15 +137,15 @@ public:
   void sketch_minimizers(string &seq, std::queue<tuple<libs::Value, libs::Index, Strand>> &queue)
   {
     std::set<libs::Index> minimizers_set;
-    const int seq_length = seq.size();
-    const string k_mer_init = seq.substr(0, k_mer_size_);
+    const int &seq_length = seq.size();
+    const string &k_mer_init = seq.substr(0, k_mer_size_);
     SlideMin k_mer_hashes_strand_0(seq2hash(k_mer_init), window_size_);
     SlideMin k_mer_hashes_strand_1(seq2hash(k_mer_init, Strand::Reverse), window_size_);
 
     for (short i = 0; i < window_size_ - 1; i++)
     {
-      Minimizer last_k_mer_hash_strand_0_value = k_mer_hashes_strand_0.last_value();
-      Minimizer last_k_mer_hash_strand_1_value = k_mer_hashes_strand_1.last_value();
+      const Minimizer &last_k_mer_hash_strand_0_value = k_mer_hashes_strand_0.last_value();
+      const Minimizer &last_k_mer_hash_strand_1_value = k_mer_hashes_strand_1.last_value();
       Minimizer new_k_mer_hash_strand_0_value;
       Minimizer new_k_mer_hash_strand_1_value;
       calc_hash(
@@ -157,9 +157,9 @@ public:
       k_mer_hashes_strand_0.add(new_k_mer_hash_strand_0_value);
       k_mer_hashes_strand_1.add(new_k_mer_hash_strand_1_value);
     }
-    auto [k_mer_hash_strand_0_index,
+    const auto &[k_mer_hash_strand_0_index,
           k_mer_hash_strand_0_value] = k_mer_hashes_strand_0.min();
-    auto [k_mer_hash_strand_1_index,
+    const auto &[k_mer_hash_strand_1_index,
           k_mer_hash_strand_1_value] = k_mer_hashes_strand_1.min();
     if (k_mer_hash_strand_0_value < k_mer_hash_strand_1_value)
     {
@@ -174,8 +174,8 @@ public:
 
     for (int j = 0; j < seq_length - k_mer_size_ - window_size_ + 1; j++)
     {
-      Minimizer last_k_mer_hash_strand_0_value = k_mer_hashes_strand_0.last_value();
-      Minimizer last_k_mer_hash_strand_1_value = k_mer_hashes_strand_1.last_value();
+      const Minimizer &last_k_mer_hash_strand_0_value = k_mer_hashes_strand_0.last_value();
+      const Minimizer &last_k_mer_hash_strand_1_value = k_mer_hashes_strand_1.last_value();
       Minimizer new_k_mer_hash_strand_0_value;
       Minimizer new_k_mer_hash_strand_1_value;
       calc_hash(
@@ -184,9 +184,9 @@ public:
           seq[k_mer_size_ + window_size_ + j - 1],
           new_k_mer_hash_strand_0_value,
           new_k_mer_hash_strand_1_value);
-      auto [k_mer_hash_strand_0_index,
+      const auto &[k_mer_hash_strand_0_index,
             k_mer_hash_strand_0_value] = k_mer_hashes_strand_0.add(new_k_mer_hash_strand_0_value);
-      auto [k_mer_hash_strand_1_index,
+      const auto &[k_mer_hash_strand_1_index,
             k_mer_hash_strand_1_value] = k_mer_hashes_strand_1.add(new_k_mer_hash_strand_1_value);
       if (
           k_mer_hash_strand_0_value < k_mer_hash_strand_1_value && minimizers_set.count(k_mer_hash_strand_0_index) == 0)
@@ -211,11 +211,9 @@ public:
     sketch_minimizers(read_seq, read_minimizer_queue);
     while (!read_minimizer_queue.empty())
     {
-      auto [read_minimizer, read_pos, read_strand] = read_minimizer_queue.front();
+      auto &[read_minimizer, read_pos, read_strand] = read_minimizer_queue.front();
       for (auto &[ref_id, ref_pos, ref_strand] : ref_minimizer_dict[read_minimizer])
       {
-        std::chrono::system_clock::time_point start;
-        start = std::chrono::system_clock::now();
         if (read_strand == ref_strand)
         {
           hits[ref_id][ref_pos - read_pos + 1]++;
@@ -228,7 +226,7 @@ public:
       read_minimizer_queue.pop();
     }
 
-    short max_cnt = 0;
+    short max_cnt;
     string output;
     for (auto &[ref_id, counter] : hits)
     {
@@ -269,7 +267,7 @@ public:
     {
       for (short idx = seq.size(); idx-- > 0;)
       {
-        char base = seq[idx];
+        char &base = seq[idx];
         res = (res << 2) | (3 - NUCLEOTIDE_TO_INTEGER_MAPPING.at(base));
       }
     }
@@ -287,7 +285,7 @@ public:
       sketch_minimizers(ref_seq_pair.second, ref_minimizer_queue);
       while (!ref_minimizer_queue.empty())
       {
-        auto [minimizer, ref_pos, strand] = ref_minimizer_queue.front();
+        auto &[minimizer, ref_pos, strand] = ref_minimizer_queue.front();
         ref_minimizer_dict[minimizer].push_back(tuple(ref_seq_pair.first, ref_pos, strand));
         ref_minimizer_queue.pop();
       }
