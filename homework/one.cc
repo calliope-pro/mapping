@@ -137,8 +137,8 @@ public:
   void sketch_minimizers(string &seq, std::queue<tuple<libs::Value, libs::Index, Strand>> &queue)
   {
     std::set<libs::Index> minimizers_set;
-    const int &seq_length = seq.size();
-    const string &k_mer_init = seq.substr(0, k_mer_size_);
+    const int seq_length = seq.size();
+    const string k_mer_init = seq.substr(0, k_mer_size_);
     SlideMin k_mer_hashes_strand_0(seq2hash(k_mer_init), window_size_);
     SlideMin k_mer_hashes_strand_1(seq2hash(k_mer_init, Strand::Reverse), window_size_);
 
