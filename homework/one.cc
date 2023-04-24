@@ -64,7 +64,7 @@ public:
         ref_seq_file_path_(ref_seq_file_path),
         window_size_(window_size),
         k_mer_size_(k_mer_size),
-        k_mer_hash_mod_((1 << ((k_mer_size - 1) * 2)) - 1)
+        k_mer_hash_mod_((1ULL << ((k_mer_size - 1) * 2)) - 1)
   {
     time_t now;
     time(&now);
@@ -311,7 +311,7 @@ int main()
         CURRENT_FOLDER_DIR / "homework" / "test" / "read.fastq",
         CURRENT_FOLDER_DIR / "homework" / "test" / "ref.fasta",
         10,
-        15);
+        30);
     minimap.run();
   }
   else
@@ -320,7 +320,7 @@ int main()
         CURRENT_FOLDER_DIR / "SE11" / "Illumina_SE11.fastq",
         CURRENT_FOLDER_DIR / "SE11" / "ref_SE11.fasta",
         10,
-        15);
+        30);
     minimap.run();
   }
 
