@@ -226,7 +226,7 @@ public:
       read_minimizer_queue.pop();
     }
 
-    short max_cnt;
+    short max_cnt = 0;
     string output;
     for (auto &[ref_id, counter] : hits)
     {
